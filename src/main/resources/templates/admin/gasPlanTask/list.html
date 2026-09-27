@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('巡检到期任务台账')"/>
+</head>
+<body class="pear-container">
+<div class="layui-card">
+    <div class="layui-card-body">
+        <form class="layui-form" action="">
+            <div class="layui-form-item">
+                <label class="layui-form-label">事项号</label>
+                <div class="layui-input-inline">
+                    <input type="text" name="itemNo" placeholder="" class="layui-input">
+                </div>
+
+                <label class="layui-form-label">状态</label>
+                <div class="layui-input-inline">
+                    <select name="status">
+                        <option value="">全部</option>
+                        <option value="0">待派</option>
+                        <option value="1">已派</option>
+                        <option value="2">派不出去</option>
+                    </select>
+                </div>
+                <button class="pear-btn pear-btn-md pear-btn-primary" lay-submit lay-filter="gasPlanTask-query">
+                    <i class="layui-icon layui-icon-search"></i>
+                    查询
+                </button>
+                <button type="reset" class="pear-btn pear-btn-md">
+                    <i class="layui-icon layui-icon-refresh"></i>
+                    重置
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+<div class="layui-card">
+    <div class="layui-card-body">
+        <table id="gasPlanTask-table" lay-filter="gasPlanTask-table"></table>
+    </div>
+</div>
+</body>
+
+<script type="text/html" id="gasPlanTask-toolbar">
+    <button shiro:hasPermission="gasPlanTask:scan" class="pear-btn pear-btn-primary pear-btn-md" lay-event="scan">
+        <i class="layui-icon layui-icon-time"></i>
+        立即扫描
+    </button>
+    <button shiro:hasPermission="gasPlanTask:dispatch" class="pear-btn pear-btn-warming pear-btn-md" lay-event="batchDispatch">
+        <i class="layui-icon layui-icon-release"></i>
+        批量派单
+    </button>
+</script>
+
+<script type="text/html" id="gasPlanTask-bar">
+    {{# if(d.status == 0){ }}
+    <button shiro:hasPermission="gasPlanTask:dispatch" class="pear-btn pear-btn-primary pear-btn-sm" lay-event="dispatch" title="派单"><i class="layui-icon layui-icon-release"></i>
+    </button>
+    {{# } }}
+</script>
+
+<script type="text/html" id="gasPlanTask-status">
+    {{# if(d.status == 0){ }}
+    <span class="layui-badge layui-bg-orange">待派</span>
+    {{# }else if(d.status == 1){ }}
+    <span class="layui-badge layui-bg-green">已派</span>
+    {{# }else if(d.status == 2){ }}
+    <span class="layui-badge layui-bg-gray">派不出去</span>
+    {{# } }}
+</script>
+
+<script type="text/html" id="gasPlanTask-urgent">
+    {{# if(d.urgent == 1){ }}
+    <span class="layui-badge layui-bg-red">紧急</span>
+    {{# }else{ }}
+    <span class="layui-badge layui-bg-blue">普通</span>
+    {{# } }}
+</script>
+
+<script type="text/html" id="gasPlanTask-overdue">
+    {{# if(d.overdueDays > 0){ }}
+    <span style="color:#FF5722;font-weight:bold">超期 {{d.overdueDays}} 天</span>
+    {{# }else{ }}
+    <span>未超期</span>
+    {{# } }}
+</script>
+
+<th:block th:include="include :: footer"/>
+<script>
+    layui.use(['table', 'form', 'jquery'], function () {
+        let table = layui.table;
+        let form = layui.form;
+        let $ = layui.jquery;
+
+        let MODULE_PATH = rootPath+"/gasPlanTask/";
+        let cols = [
+            [
+                {type: 'checkbox'},
+                {title: 'ID', field: 'id', align: 'center', hide: true},
+                {title: '事项号', field: 'itemNo', align: 'left'},
+                {title: '截止时刻', field: 'dueAt', align: 'center'},
+                {title: '提前派单(天)', field: 'amount', align: 'center'},
+                {title: '超期情况', field: 'overdueDays', align: 'center', toolbar: '#gasPlanTask-overdue'},
+                {title: '紧急程度', field: 'urgent', align: 'center', toolbar: '#gasPlanTask-urgent'},
+                {title: '状态', field: 'status', align: 'center', toolbar: '#gasPlanTask-status'},
+                {title: '派单事由', field: 'content', align: 'left'},
+                {title: '创建时间', field: 'createTime', align: 'center'},
+                {title: '操作', toolbar: '#gasPlanTask-bar', align: 'center'}
+            ]
+        ]
+
+        //table表单列表
+        table.render({
+            elem: '#gasPlanTask-table',
+            url: MODULE_PATH + 'list',
+            page: true,
+            method: 'get',
+            cols: cols,
+            skin: 'line',
+            toolbar: '#gasPlanTask-toolbar',
+            defaultToolbar: [{
+                layEvent: 'refresh',
+                icon: 'layui-icon-refresh',
+            }, 'filter', 'print', 'exports'],
+            where: {
+                orderByColumn: "id",
+                isAsc: "asc"
+            }
+        });
+
+        //table图标事件绑定
+        table.on('tool(gasPlanTask-table)', function (obj) {
+            if (obj.event === 'dispatch') {
+                window.dispatch([obj.data['id']]);
+            }
+        });
+
+        //table工具栏绑定
+        table.on('toolbar(gasPlanTask-table)', function (obj) {
+            if (obj.event === 'scan') {
+                window.scan();
+            } else if (obj.event === 'refresh') {
+                window.refresh();
+            } else if (obj.event === 'batchDispatch') {
+                let data = table.checkStatus(obj.config.id).data;
+                if (data.length === 0) {
+                    layer.msg("未选中数据", {icon: 3, time: 1000});
+                    return false;
+                }
+                let ids = [];
+                for (let i = 0; i < data.length; i++) {
+                    if (data[i].status !== 0) {
+                        layer.msg("事项号 " + data[i].itemNo + " 不是待派状态，请重新选择", {icon: 3, time: 1500});
+                        return false;
+                    }
+                    ids.push(data[i].id);
+                }
+                window.dispatch(ids);
+            }
+        });
+
+        //查询按钮绑定
+        form.on('submit(gasPlanTask-query)', function (data) {
+            table.reload('gasPlanTask-table', {where: data.field})
+            return false;
+        });
+
+        //立即扫描一轮
+        window.scan = function () {
+            layer.confirm('立即扫描一轮到期任务并自动派单？', {icon: 3, title: '提示'}, function (index) {
+                layer.close(index);
+                let loading = layer.load();
+                $.ajax({
+                    url: MODULE_PATH + "scan",
+                    dataType: 'json',
+                    type: 'post',
+                    success: function (result) {
+                        layer.close(loading);
+                        if (result.code == 200) {
+                            layer.msg(result.msg, {icon: 1, time: 1500}, function () {
+                                table.reload('gasPlanTask-table');
+                            });
+                        } else {
+                            layer.msg(result.msg, {icon: 2, time: 1500});
+                        }
+                    }
+                })
+            });
+        }
+
+        //派单（单个或批量）
+        window.dispatch = function (ids) {
+            layer.open({
+                type: 2,
+                title: '任务派单',
+                shade: 0.1,
+                area: ['500px', '450px'],
+                content: MODULE_PATH + 'dispatchView?ids=' + ids.join(',')
+            });
+        }
+
+        //刷新
+        window.refresh = function () {
+            table.reload('gasPlanTask-table');
+        }
+    });
+</script>
+</html>

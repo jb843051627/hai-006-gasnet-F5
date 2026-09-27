@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('泄漏浓度分档规则')"/>
+</head>
+<body class="pear-container">
+<div class="layui-card">
+    <div class="layui-card-body">
+        <form class="layui-form" action="">
+            <div class="layui-form-item">
+                <label class="layui-form-label">规则代号</label>
+                <div class="layui-input-inline">
+                    <input type="text" name="ruleCode" placeholder="" class="layui-input">
+                </div>
+
+                <label class="layui-form-label">判线名</label>
+                <div class="layui-input-inline">
+                    <input type="text" name="ruleName" placeholder="" class="layui-input">
+                </div>
+
+                <label class="layui-form-label">情形</label>
+                <div class="layui-input-inline">
+                    <select name="status">
+                        <option value="">全部</option>
+                        <option value="0">现行</option>
+                        <option value="1">已让位</option>
+                    </select>
+                </div>
+                <button class="pear-btn pear-btn-md pear-btn-primary" lay-submit lay-filter="gasConcRule-query">
+                    <i class="layui-icon layui-icon-search"></i>
+                    查询
+                </button>
+                <button type="reset" class="pear-btn pear-btn-md">
+                    <i class="layui-icon layui-icon-refresh"></i>
+                    重置
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+<div class="layui-card">
+    <div class="layui-card-body">
+        <div class="layui-btn-group" style="margin-bottom: 10px;">
+            <button shiro:hasPermission="gasConcRule:add" class="pear-btn pear-btn-md pear-btn-primary" onclick="addRule()">
+                <i class="layui-icon layui-icon-add-1"></i> 新建规则
+            </button>
+        </div>
+        <table id="gasConcRule-table" lay-filter="gasConcRule-table"></table>
+    </div>
+</div>
+</body>
+
+<script type="text/html" id="gasConcRule-status">
+    {{# if(d.status == 0){ }}
+    <span class="layui-badge layui-bg-green">现行</span>
+    {{# }else{ }}
+    <span class="layui-badge layui-bg-gray">已让位</span>
+    {{# } }}
+</script>
+
+<script type="text/html" id="gasConcRule-bar">
+    <button shiro:hasPermission="gasConcRule:addVersion" class="pear-btn pear-btn-primary pear-btn-sm" lay-event="addVersion" title="发布新版本"><i class="layui-icon layui-icon-upload"></i></button>
+    <button shiro:hasPermission="gasConcRule:edit" class="pear-btn pear-btn-warming pear-btn-sm" lay-event="edit" title="编辑"><i class="layui-icon layui-icon-edit"></i></button>
+    {{# if(d.status == 0){ }}
+    <button shiro:hasPermission="gasConcRule:retire" class="pear-btn pear-btn-normal pear-btn-sm" lay-event="retire" title="停用交棒"><i class="layui-icon layui-icon-pause"></i></button>
+    {{# } }}
+    <button shiro:hasPermission="gasConcRule:remove" class="pear-btn pear-btn-danger pear-btn-sm" lay-event="remove" title="删除"><i class="layui-icon layui-icon-delete"></i></button>
+</script>
+
+<th:block th:include="include :: footer"/>
+<script>
+    layui.use(['table', 'form', 'jquery'], function () {
+        let table = layui.table;
+        let form = layui.form;
+        let $ = layui.jquery;
+
+        let MODULE_PATH = rootPath + "/gasConcRule/";
+        let cols = [
+            [
+                {title: 'ID', field: 'id', align: 'center', hide: true},
+                {title: '规则代号', field: 'ruleCode', align: 'left', width: 130},
+                {title: '版本号', field: 'version', align: 'center', width: 80, templet: function (d) {
+                        return 'V' + (d.version == null ? '-' : d.version);
+                    }},
+                {title: '判线名', field: 'ruleName', align: 'left'},
+                {title: '轻微上限(ppm)', field: 'th1Max', align: 'center'},
+                {title: '中度上限(ppm)', field: 'th2Max', align: 'center'},
+                {title: '严重上限(ppm)', field: 'th3Max', align: 'center'},
+                {title: '生效日', field: 'effStart', align: 'center'},
+                {title: '交棒日(不含)', field: 'effEnd', align: 'center', templet: function (d) {
+                        return d.effEnd == null || d.effEnd === '' ? '长期有效' : d.effEnd;
+                    }},
+                {title: '优先级', field: 'priority', align: 'center', width: 80},
+                {title: '情形', field: 'status', align: 'center', toolbar: '#gasConcRule-status'},
+                {title: '操作', toolbar: '#gasConcRule-bar', align: 'center', width: 190, fixed: 'right'}
+            ]
+        ];
+
+        table.render({
+            elem: '#gasConcRule-table',
+            url: MODULE_PATH + 'list',
+            page: true,
+            method: 'get',
+            cols: cols,
+            skin: 'line',
+            defaultToolbar: [{'layEvent': 'refresh', icon: 'layui-icon-refresh'}, 'filter', 'print', 'exports'],
+            where: {orderByColumn: "id", isAsc: "asc"}
+        });
+
+        table.on('tool(gasConcRule-table)', function (obj) {
+            if (obj.event === 'addVersion') {
+                addVersion(obj.data['ruleCode']);
+            } else if (obj.event === 'edit') {
+                edit(obj.data['id']);
+            } else if (obj.event === 'retire') {
+                retire(obj.data['id']);
+            } else if (obj.event === 'remove') {
+                remove(obj.data['id']);
+            }
+        });
+
+        form.on('submit(gasConcRule-query)', function (data) {
+            table.reload('gasConcRule-table', {where: data.field});
+            return false;
+        });
+
+        window.addRule = function () {
+            layer.open({
+                type: 2, title: '新建规则（发布首个版本）',
+                area: ['560px', '560px'], shadeClose: false,
+                content: MODULE_PATH + 'add'
+            });
+        };
+        window.addVersion = function (ruleCode) {
+            layer.open({
+                type: 2, title: '为「' + ruleCode + '」发布新版本',
+                area: ['560px', '560px'], shadeClose: false,
+                content: MODULE_PATH + 'addVersion?ruleCode=' + encodeURIComponent(ruleCode)
+            });
+        };
+        window.edit = function (id) {
+            layer.open({
+                type: 2, title: '编辑规则版本',
+                area: ['560px', '560px'], shadeClose: false,
+                content: MODULE_PATH + 'edit?id=' + id
+            });
+        };
+        window.retire = function (id) {
+            layer.confirm('确认立即停用该版本并交棒？停用后该时刻起的检测将不再适用本版本（历史评定不受影响）。',
+                {icon: 3, title: '停用确认'}, function (index) {
+                    layer.close(index);
+                    let loading = layer.load();
+                    $.ajax({
+                        url: MODULE_PATH + "retire",
+                        data: {id: id}, dataType: 'json', type: 'post',
+                        success: function (result) {
+                            layer.close(loading);
+                            if (result.code == 200) {
+                                layer.msg(result.msg, {icon: 1, time: 1000}, function () {
+                                    table.reload('gasConcRule-table');
+                                });
+                            } else {
+                                layer.msg(result.msg, {icon: 2, time: 1500});
+                            }
+                        }
+                    });
+                });
+        };
+        window.remove = function (id) {
+            layer.confirm('确认删除该规则版本？历史评定记录保留版本快照不受影响。',
+                {icon: 3, title: '删除确认'}, function (index) {
+                    layer.close(index);
+                    let loading = layer.load();
+                    $.ajax({
+                        url: MODULE_PATH + "remove",
+                        data: {ids: id}, dataType: 'json', type: 'delete',
+                        success: function (result) {
+                            layer.close(loading);
+                            if (result.code == 200) {
+                                layer.msg(result.msg, {icon: 1, time: 1000}, function () {
+                                    table.reload('gasConcRule-table');
+                                });
+                            } else {
+                                layer.msg(result.msg, {icon: 2, time: 1500});
+                            }
+                        }
+                    });
+                });
+        };
+    });
+</script>
+</html>

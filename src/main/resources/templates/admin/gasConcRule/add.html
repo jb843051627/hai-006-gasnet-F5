@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:include="include :: header('新建分档规则')"/>
+</head>
+<body>
+<form class="layui-form">
+    <div class="mainBox">
+        <div class="main-container">
+            <div class="layui-form-item">
+                <label class="layui-form-label">规则代号</label>
+                <div class="layui-input-block">
+                    <input type="text" name="ruleCode" lay-verify="required" autocomplete="off"
+                           placeholder="如 CITY-MID，同一代号下用版本迭代阈值" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">判线名</label>
+                <div class="layui-input-block">
+                    <input type="text" name="ruleName" autocomplete="off" placeholder="如 城区中压管网浓度判线"
+                           class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">轻度上限</label>
+                <div class="layui-input-inline" style="width: 200px;">
+                    <input type="number" step="0.01" min="0" name="th1Max" lay-verify="required"
+                           autocomplete="off" placeholder="ppm，等于上限取高一档" class="layui-input">
+                </div>
+                <div class="layui-form-mid layui-word-aux">ppm</div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">中度上限</label>
+                <div class="layui-input-inline" style="width: 200px;">
+                    <input type="number" step="0.01" min="0" name="th2Max" lay-verify="required"
+                           autocomplete="off" placeholder="ppm" class="layui-input">
+                </div>
+                <div class="layui-form-mid layui-word-aux">ppm</div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">严重上限</label>
+                <div class="layui-input-inline" style="width: 200px;">
+                    <input type="number" step="0.01" min="0" name="th3Max" lay-verify="required"
+                           autocomplete="off" placeholder="ppm" class="layui-input">
+                </div>
+                <div class="layui-form-mid layui-word-aux">ppm</div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">生效日</label>
+                <div class="layui-input-inline" style="width: 200px;">
+                    <input type="text" name="effStart" id="effStart" autocomplete="off"
+                           placeholder="留空则立即生效" class="layui-input">
+                </div>
+                <div class="layui-form-mid layui-word-aux">留空立即生效；区间左闭右开</div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">优先级</label>
+                <div class="layui-input-inline" style="width: 200px;">
+                    <input type="number" name="priority" autocomplete="off" value="0" class="layui-input">
+                </div>
+                <div class="layui-form-mid layui-word-aux">多判线并存时数值大的优先</div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">备注</label>
+                <div class="layui-input-block">
+                    <textarea name="remark" class="layui-textarea" placeholder=""></textarea>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="bottom">
+        <div class="button-container">
+            <button type="submit" class="layui-btn layui-btn-normal layui-btn-sm" lay-submit
+                    lay-filter="rule-save">
+                <i class="layui-icon layui-icon-ok"></i>
+                发布
+            </button>
+            <button type="reset" class="layui-btn layui-btn-primary layui-btn-sm">
+                <i class="layui-icon layui-icon-refresh"></i>
+                重置
+            </button>
+        </div>
+    </div>
+</form>
+<th:block th:include="include :: footer"/>
+<script th:inline="javascript">
+    layui.use(['form', 'jquery', 'laydate'], function () {
+        let form = layui.form;
+        let $ = layui.jquery;
+        let laydate = layui.laydate;
+        let MODULE_PATH = rootPath + "/gasConcRule/";
+
+        laydate.render({elem: '#effStart', type: 'datetime', format: 'yyyy-MM-dd HH:mm:ss'});
+
+        form.on('submit(rule-save)', function (data) {
+            $.ajax({
+                url: MODULE_PATH + 'add',
+                data: data.field, dataType: 'json',
+                contentType: 'application/x-www-form-urlencoded', type: 'post',
+                success: function (result) {
+                    if (result.code == 200) {
+                        layer.msg(result.msg, {icon: 1, time: 1000}, function () {
+                            parent.layer.close(parent.layer.getFrameIndex(window.name));
+                            parent.layui.table.reload("gasConcRule-table");
+                        });
+                    } else {
+                        layer.msg(result.msg, {icon: 2, time: 1500});
+                    }
+                }
+            });
+            return false;
+        });
+    });
+</script>
+</body>
+</html>

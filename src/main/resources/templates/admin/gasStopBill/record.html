@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:include="include :: header('审批履历')"/>
+</head>
+<body class="pear-container">
+<input type="hidden" id="billId" th:value="${billId}">
+<div class="layui-card">
+    <div class="layui-card-body">
+        <table id="gasStopBillRecord-table" lay-filter="gasStopBillRecord-table"></table>
+    </div>
+</div>
+</body>
+
+<script type="text/html" id="gasStopBillRecord-action">
+    {{# if(d.action == 0){ }}
+    <span class="layui-badge layui-bg-blue">提交</span>
+    {{# }else if(d.action == 1){ }}
+    <span class="layui-badge layui-bg-green">通过</span>
+    {{# }else if(d.action == 2){ }}
+    <span class="layui-badge layui-bg-orange">退回补充</span>
+    {{# }else if(d.action == 3){ }}
+    <span class="layui-badge layui-bg-gray">否决</span>
+    {{# } }}
+</script>
+
+<th:block th:include="include :: footer"/>
+<script>
+    layui.use(['table', 'jquery'], function () {
+        let table = layui.table;
+        let $ = layui.jquery;
+
+        let MODULE_PATH = rootPath+"/gasStopBill/";
+        let cols = [
+            [
+                {title: 'ID', field: 'id', align: 'center', hide: true},
+                {title: '审批环节', field: 'nodeName', align: 'center'},
+                {title: '动作', field: 'action', align: 'center', toolbar: '#gasStopBillRecord-action'},
+                {title: '审批人', field: 'approver', align: 'center'},
+                {title: '审批意见', field: 'opinion', align: 'left'},
+                {title: '审批时间', field: 'createTime', align: 'center'}
+            ]
+        ]
+
+        //履历列表（不分页，按审批时间升序）
+        table.render({
+            elem: '#gasStopBillRecord-table',
+            url: MODULE_PATH + 'records?billId=' + $('#billId').val(),
+            page: false,
+            method: 'get',
+            cols: cols,
+            skin: 'line'
+        });
+    });
+</script>
+</html>

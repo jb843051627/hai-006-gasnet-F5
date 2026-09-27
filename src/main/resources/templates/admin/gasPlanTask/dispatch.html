@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:include="include :: header('任务派单')"/>
+</head>
+<body>
+<form class="layui-form">
+    <div class="mainBox">
+        <div class="main-container">
+            <input type="hidden" name="ids" th:value="${ids}">
+
+            <div class="layui-form-item">
+                <label class="layui-form-label">分配方式</label>
+                <div class="layui-input-block">
+                    <input type="radio" name="mode" value="auto" title="按班组负载自动均衡" lay-filter="dispatch-mode" checked>
+                    <input type="radio" name="mode" value="team" title="指定班组" lay-filter="dispatch-mode">
+                    <input type="radio" name="mode" value="inspector" title="指定巡检员" lay-filter="dispatch-mode">
+                </div>
+            </div>
+
+            <div class="layui-form-item" id="team-block" style="display:none">
+                <label class="layui-form-label">接收班组</label>
+                <div class="layui-input-block">
+                    <select name="teamId">
+                        <option th:each="team : ${teams}" th:value="${team.id}" th:text="${team.deptName}"></option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="layui-form-item" id="inspector-block" style="display:none">
+                <label class="layui-form-label">接收巡检员</label>
+                <div class="layui-input-block">
+                    <select name="inspectorId">
+                        <option th:each="u : ${inspectors}" th:value="${u.id}"
+                                th:text="${u.nickname != null ? u.nickname : u.username}"></option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="layui-form-item">
+                <div class="layui-input-block">
+                    <span class="layui-font-12" style="color:#999">自动均衡：按各班组当前未完成任务数，优先派给负载最低的班组；超期3天以上的紧急任务优先派发。</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="bottom">
+        <div class="button-container">
+            <button type="submit" class="layui-btn layui-btn-normal layui-btn-sm" lay-submit="" lay-filter="gasPlanTask-dispatch">
+                <i class="layui-icon layui-icon-ok"></i>
+                确认派单
+            </button>
+        </div>
+    </div>
+</form>
+<th:block th:include="include :: footer"/>
+<script>
+    layui.use(['form', 'jquery'], function () {
+        let form = layui.form;
+        let $ = layui.jquery;
+        let MODULE_PATH = rootPath + "/gasPlanTask";
+
+        //分配方式切换
+        form.on('radio(dispatch-mode)', function (data) {
+            $('#team-block').toggle(data.value === 'team');
+            $('#inspector-block').toggle(data.value === 'inspector');
+        });
+
+        //确认派单
+        form.on('submit(gasPlanTask-dispatch)', function (data) {
+            let postData = {ids: data.field.ids};
+            if (data.field.mode === 'team') {
+                postData.targetType = 0;
+                postData.targetId = data.field.teamId;
+            } else if (data.field.mode === 'inspector') {
+                postData.targetType = 1;
+                postData.targetId = data.field.inspectorId;
+            }
+            let loading = layer.load();
+            $.ajax({
+                url: MODULE_PATH + '/dispatch',
+                data: postData,
+                dataType: 'json',
+                contentType: 'application/x-www-form-urlencoded',
+                type: 'post',
+                success: function (result) {
+                    layer.close(loading);
+                    if (result.code == 200) {
+                        layer.msg(result.msg, {icon: 1, time: 1000}, function () {
+                            parent.layer.close(parent.layer.getFrameIndex(window.name));//关闭当前页
+                            parent.layui.table.reload("gasPlanTask-table");
+                        });
+                    } else {
+                        layer.msg(result.msg, {icon: 2, time: 1500});
+                    }
+                }
+            })
+            return false;
+        });
+    })
+</script>
+</body>
+</html>

@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('泄漏浓度检测评定记录')"/>
+</head>
+<body class="pear-container">
+<div class="layui-card">
+    <div class="layui-card-body">
+        <form class="layui-form" action="">
+            <div class="layui-form-item">
+                <label class="layui-form-label">检测时间</label>
+                <div class="layui-input-inline" style="width: 170px;">
+                    <input type="text" name="beginTime" id="beginTime" autocomplete="off" placeholder="开始时间"
+                           class="layui-input">
+                </div>
+                <div class="layui-form-mid">至</div>
+                <div class="layui-input-inline" style="width: 170px;">
+                    <input type="text" name="endTime" id="endTime" autocomplete="off" placeholder="结束时间"
+                           class="layui-input">
+                </div>
+
+                <label class="layui-form-label">检测点</label>
+                <div class="layui-input-inline">
+                    <input type="text" name="siteName" placeholder="检测点名称" class="layui-input">
+                </div>
+
+                <label class="layui-form-label">等级</label>
+                <div class="layui-input-inline">
+                    <select name="gradeLevel">
+                        <option value="">全部</option>
+                        <option value="1">轻微泄漏</option>
+                        <option value="2">中度泄漏</option>
+                        <option value="3">严重泄漏</option>
+                        <option value="4">极严重泄漏</option>
+                        <option value="0">无法判定</option>
+                    </select>
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">复核情形</label>
+                <div class="layui-input-inline">
+                    <select name="recheckStatus">
+                        <option value="">全部</option>
+                        <option value="0">未复核</option>
+                        <option value="1">已重算维持</option>
+                        <option value="2">重算后变更</option>
+                    </select>
+                </div>
+
+                <label class="layui-form-label">记录号</label>
+                <div class="layui-input-inline">
+                    <input type="text" name="checkNo" class="layui-input">
+                </div>
+
+                <label class="layui-form-label">导入批次号</label>
+                <div class="layui-input-inline">
+                    <input type="text" name="batchNo" placeholder="精确匹配" class="layui-input">
+                </div>
+
+                <button class="pear-btn pear-btn-md pear-btn-primary" lay-submit lay-filter="gasLeakCheck-query">
+                    <i class="layui-icon layui-icon-search"></i>
+                    查询
+                </button>
+                <button type="reset" class="pear-btn pear-btn-md">
+                    <i class="layui-icon layui-icon-refresh"></i>
+                    重置
+                </button>
+                <button shiro:hasPermission="gasLeakCheck:add" type="button"
+                        class="pear-btn pear-btn-md pear-btn-warming" onclick="addCheck()">
+                    <i class="layui-icon layui-icon-add-1"></i>
+                    检测录入
+                </button>
+                <button shiro:hasPermission="gasLeakCheck:recheck" type="button"
+                        class="pear-btn pear-btn-md" onclick="recheckRange()">
+                    <i class="layui-icon layui-icon-refresh-3"></i>
+                    按时间段批量复核
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+<div class="layui-card">
+    <div class="layui-card-body">
+        <table id="gasLeakCheck-table" lay-filter="gasLeakCheck-table"></table>
+    </div>
+</div>
+</body>
+
+<script type="text/html" id="gasLeakCheck-grade">
+    {{# if(d.gradeLevel == 1){ }}
+    <span class="layui-badge layui-bg-blue">轻微</span>
+    {{# }else if(d.gradeLevel == 2){ }}
+    <span class="layui-badge layui-bg-orange">中度</span>
+    {{# }else if(d.gradeLevel == 3){ }}
+    <span class="layui-badge layui-bg-red">严重</span>
+    {{# }else if(d.gradeLevel == 4){ }}
+    <span class="layui-badge layui-bg-red">极严重</span>
+    {{# }else{ }}
+    <span class="layui-badge layui-bg-gray">无法判定</span>
+    {{# } }}
+</script>
+
+<script type="text/html" id="gasLeakCheck-recheck">
+    {{# if(d.recheckStatus == 0){ }}
+    <span class="layui-badge layui-bg-gray">未复核</span>
+    {{# }else if(d.recheckStatus == 1){ }}
+    <span class="layui-badge layui-bg-green">已重算维持</span>
+    {{# }else{ }}
+    <span class="layui-badge layui-bg-red">重算变更 → {{d.recheckGradeLevel}}</span>
+    {{# } }}
+</script>
+
+<script type="text/html" id="gasLeakCheck-bar">
+    <button shiro:hasPermission="gasLeakCheck:recheck" class="pear-btn pear-btn-primary pear-btn-sm"
+            lay-event="recheck" title="按原始检测时间复核重算"><i class="layui-icon layui-icon-refresh-3"></i>
+    </button>
+</script>
+
+<th:block th:include="include :: footer"/>
+<script>
+    layui.use(['table', 'form', 'jquery', 'laydate', 'layer'], function () {
+        let table = layui.table;
+        let form = layui.form;
+        let $ = layui.jquery;
+        let laydate = layui.laydate;
+
+        let MODULE_PATH = rootPath + "/gasLeakCheck/";
+        laydate.render({elem: '#beginTime', type: 'datetime', format: 'yyyy-MM-dd HH:mm:ss'});
+        laydate.render({elem: '#endTime', type: 'datetime', format: 'yyyy-MM-dd HH:mm:ss'});
+
+        let cols = [
+            [
+                {title: 'ID', field: 'id', align: 'center', hide: true},
+                {title: '记录号', field: 'checkNo', align: 'left', width: 180},
+                {title: '检测时间', field: 'detectTime', align: 'center', width: 170},
+                {title: '检测点代号', field: 'siteNo', align: 'left', width: 120},
+                {title: '检测点名称', field: 'siteName', align: 'left'},
+                {title: '原始浓度(ppm)', field: 'concValue', align: 'center', width: 120},
+                {title: '经度', field: 'lng', align: 'center', width: 105},
+                {title: '纬度', field: 'lat', align: 'center', width: 105},
+                {title: '导入批次号', field: 'batchNo', align: 'left', width: 190, templet: function (d) {
+                        return d.batchNo == null ? '-' : d.batchNo;
+                    }},
+                {title: '评定等级', field: 'gradeLevel', align: 'center', toolbar: '#gasLeakCheck-grade'},
+                {title: '适用规则', align: 'center', templet: function (d) {
+                        if (d.ruleCode == null) return '-';
+                        return d.ruleCode + ' V' + d.ruleVersion;
+                    }},
+                {title: '复核情形', field: 'recheckStatus', align: 'center', toolbar: '#gasLeakCheck-recheck'},
+                {title: '复核人', field: 'recheckBy', align: 'center'},
+                {title: '复核时间', field: 'recheckTime', align: 'center', width: 170},
+                {title: '操作', toolbar: '#gasLeakCheck-bar', align: 'center', width: 90, fixed: 'right'}
+            ]
+        ];
+
+        table.render({
+            elem: '#gasLeakCheck-table',
+            url: MODULE_PATH + 'list',
+            page: true,
+            method: 'get',
+            cols: cols,
+            skin: 'line',
+            defaultToolbar: [{'layEvent': 'refresh', icon: 'layui-icon-refresh'}, 'filter', 'print', 'exports'],
+            where: {orderByColumn: "detect_time", isAsc: "desc"}
+        });
+
+        table.on('tool(gasLeakCheck-table)', function (obj) {
+            if (obj.event === 'recheck') {
+                recheckOne(obj.data['id']);
+            }
+        });
+
+        form.on('submit(gasLeakCheck-query)', function (data) {
+            table.reload('gasLeakCheck-table', {where: data.field});
+            return false;
+        });
+
+        window.addCheck = function () {
+            layer.open({
+                type: 2, title: '泄漏浓度检测录入评定',
+                area: ['560px', '540px'], shadeClose: false,
+                content: MODULE_PATH + 'add'
+            });
+        };
+
+        window.recheckOne = function (id) {
+            layer.prompt({title: '复核重算（按原始检测时间重新选版判档，原评定保留）', formType: 2,
+                value: '', placeholder: '可填写复核说明'}, function (remark, index) {
+                layer.close(index);
+                let loading = layer.load();
+                $.ajax({
+                    url: MODULE_PATH + "recheck",
+                    data: {id: id, recheckRemark: remark}, dataType: 'json', type: 'post',
+                    success: function (result) {
+                        layer.close(loading);
+                        if (result.code == 200) {
+                            layer.msg(result.msg, {icon: 1, time: 1500}, function () {
+                                table.reload('gasLeakCheck-table');
+                            });
+                        } else {
+                            layer.msg(result.msg, {icon: 2, time: 1500});
+                        }
+                    }
+                });
+            });
+        };
+
+        window.recheckRange = function () {
+            let begin = $('#beginTime').val();
+            let end = $('#endTime').val();
+            if (!begin || !end) {
+                layer.msg('请先在上方选择检测时间段（开始/结束时间）', {icon: 2});
+                return;
+            }
+            layer.prompt({title: '对该时间段内全部记录复核重算，填写说明', formType: 2, placeholder: '可填写复核说明'},
+                function (remark, index) {
+                    layer.close(index);
+                    let loading = layer.load();
+                    $.ajax({
+                        url: MODULE_PATH + "recheckRange",
+                        data: {beginTime: begin, endTime: end, recheckRemark: remark},
+                        dataType: 'json', type: 'post',
+                        success: function (result) {
+                            layer.close(loading);
+                            if (result.code == 200) {
+                                layer.msg(result.msg, {icon: 1, time: 1500}, function () {
+                                    table.reload('gasLeakCheck-table');
+                                });
+                            } else {
+                                layer.msg(result.msg, {icon: 2, time: 1500});
+                            }
+                        }
+                    });
+                });
+        };
+    });
+</script>
+</html>

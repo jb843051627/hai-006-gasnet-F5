@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('巡检任务派发记录')"/>
+</head>
+<body class="pear-container">
+<div class="layui-card">
+    <div class="layui-card-body">
+        <form class="layui-form" action="">
+            <div class="layui-form-item">
+                <label class="layui-form-label">事项号</label>
+                <div class="layui-input-inline">
+                    <input type="text" name="itemNo" placeholder="" class="layui-input">
+                </div>
+
+                <label class="layui-form-label">接收对象</label>
+                <div class="layui-input-inline">
+                    <input type="text" name="targetName" placeholder="" class="layui-input">
+                </div>
+
+                <label class="layui-form-label">执行情况</label>
+                <div class="layui-input-inline">
+                    <select name="execStatus">
+                        <option value="">全部</option>
+                        <option value="0">待执行</option>
+                        <option value="1">执行中</option>
+                        <option value="2">已完成</option>
+                    </select>
+                </div>
+                <button class="pear-btn pear-btn-md pear-btn-primary" lay-submit lay-filter="gasTaskDispatch-query">
+                    <i class="layui-icon layui-icon-search"></i>
+                    查询
+                </button>
+                <button type="reset" class="pear-btn pear-btn-md">
+                    <i class="layui-icon layui-icon-refresh"></i>
+                    重置
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+<div class="layui-card">
+    <div class="layui-card-body">
+        <table id="gasTaskDispatch-table" lay-filter="gasTaskDispatch-table"></table>
+    </div>
+</div>
+</body>
+
+<script type="text/html" id="gasTaskDispatch-bar">
+    {{# if(d.execStatus == 0){ }}
+    <button shiro:hasPermission="gasTaskDispatch:updateExec" class="pear-btn pear-btn-primary pear-btn-sm" lay-event="start" title="开始执行"><i class="layui-icon layui-icon-play"></i>
+    </button>
+    {{# }else if(d.execStatus == 1){ }}
+    <button shiro:hasPermission="gasTaskDispatch:updateExec" class="pear-btn pear-btn-warming pear-btn-sm" lay-event="finish" title="完成"><i class="layui-icon layui-icon-ok"></i>
+    </button>
+    {{# } }}
+</script>
+
+<script type="text/html" id="gasTaskDispatch-targetType">
+    {{# if(d.targetType == 1){ }}
+    <span class="layui-badge layui-bg-cyan">巡检员</span>
+    {{# }else{ }}
+    <span class="layui-badge layui-bg-blue">班组</span>
+    {{# } }}
+</script>
+
+<script type="text/html" id="gasTaskDispatch-mode">
+    {{# if(d.dispatchMode == 1){ }}
+    <span class="layui-badge layui-bg-purple">手动指派</span>
+    {{# }else{ }}
+    <span class="layui-badge">自动扫描</span>
+    {{# } }}
+</script>
+
+<script type="text/html" id="gasTaskDispatch-urgent">
+    {{# if(d.urgent == 1){ }}
+    <span class="layui-badge layui-bg-red">紧急</span>
+    {{# }else{ }}
+    <span class="layui-badge layui-bg-blue">普通</span>
+    {{# } }}
+</script>
+
+<script type="text/html" id="gasTaskDispatch-execStatus">
+    {{# if(d.execStatus == 0){ }}
+    <span class="layui-badge layui-bg-orange">待执行</span>
+    {{# }else if(d.execStatus == 1){ }}
+    <span class="layui-badge layui-bg-blue">执行中</span>
+    {{# }else if(d.execStatus == 2){ }}
+    <span class="layui-badge layui-bg-green">已完成</span>
+    {{# } }}
+</script>
+
+<th:block th:include="include :: footer"/>
+<script>
+    layui.use(['table', 'form', 'jquery'], function () {
+        let table = layui.table;
+        let form = layui.form;
+        let $ = layui.jquery;
+
+        let MODULE_PATH = rootPath+"/gasTaskDispatch/";
+        let cols = [
+            [
+                {title: 'ID', field: 'id', align: 'center', hide: true},
+                {title: '派发单号', field: 'dispatchNo', align: 'left'},
+                {title: '事项号', field: 'itemNo', align: 'left'},
+                {title: '对象类型', field: 'targetType', align: 'center', toolbar: '#gasTaskDispatch-targetType'},
+                {title: '接收对象', field: 'targetName', align: 'left'},
+                {title: '派发方式', field: 'dispatchMode', align: 'center', toolbar: '#gasTaskDispatch-mode'},
+                {title: '紧急程度', field: 'urgent', align: 'center', toolbar: '#gasTaskDispatch-urgent'},
+                {title: '超期(天)', field: 'overdueDays', align: 'center'},
+                {title: '派发时间', field: 'dispatchTime', align: 'center'},
+                {title: '派发人', field: 'dispatchBy', align: 'center'},
+                {title: '执行情况', field: 'execStatus', align: 'center', toolbar: '#gasTaskDispatch-execStatus'},
+                {title: '完成时间', field: 'finishTime', align: 'center'},
+                {title: '操作', toolbar: '#gasTaskDispatch-bar', align: 'center'}
+            ]
+        ]
+
+        //table表单列表
+        table.render({
+            elem: '#gasTaskDispatch-table',
+            url: MODULE_PATH + 'list',
+            page: true,
+            method: 'get',
+            cols: cols,
+            skin: 'line',
+            defaultToolbar: [{
+                layEvent: 'refresh',
+                icon: 'layui-icon-refresh',
+            }, 'filter', 'print', 'exports'],
+            where: {
+                orderByColumn: "id",
+                isAsc: "desc"
+            }
+        });
+
+        //table图标事件绑定
+        table.on('tool(gasTaskDispatch-table)', function (obj) {
+            if (obj.event === 'start') {
+                window.updateExec(obj.data['id'], 1, '开始执行');
+            } else if (obj.event === 'finish') {
+                window.updateExec(obj.data['id'], 2, '完成');
+            }
+        });
+
+        //查询按钮绑定
+        form.on('submit(gasTaskDispatch-query)', function (data) {
+            table.reload('gasTaskDispatch-table', {where: data.field})
+            return false;
+        });
+
+        //推进执行情况
+        window.updateExec = function (id, execStatus, actionName) {
+            layer.confirm('确认将该派发单标记为「' + actionName + '」？', {icon: 3, title: '提示'}, function (index) {
+                layer.close(index);
+                let loading = layer.load();
+                $.ajax({
+                    url: MODULE_PATH + "updateExec",
+                    data: {id: id, execStatus: execStatus},
+                    dataType: 'json',
+                    type: 'post',
+                    success: function (result) {
+                        layer.close(loading);
+                        if (result.code == 200) {
+                            layer.msg(result.msg, {icon: 1, time: 1000}, function () {
+                                table.reload('gasTaskDispatch-table');
+                            });
+                        } else {
+                            layer.msg(result.msg, {icon: 2, time: 1000});
+                        }
+                    }
+                })
+            });
+        }
+    });
+</script>
+</html>

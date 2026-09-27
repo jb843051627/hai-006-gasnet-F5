@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('燃气管段停用申请')"/>
+</head>
+<body class="pear-container">
+<div class="layui-card">
+    <div class="layui-card-body">
+        <form class="layui-form" action="">
+            <div class="layui-form-item">
+                <label class="layui-form-label">签核单号</label>
+                <div class="layui-input-inline">
+                    <input type="text" name="billNo" placeholder="" class="layui-input">
+                </div>
+
+                <label class="layui-form-label">管段代号</label>
+                <div class="layui-input-inline">
+                    <input type="text" name="siteNo" placeholder="" class="layui-input">
+                </div>
+
+                <label class="layui-form-label">报批情形</label>
+                <div class="layui-input-inline">
+                    <select name="status">
+                        <option value="">全部</option>
+                        <option value="0">在核</option>
+                        <option value="1">已核讫</option>
+                        <option value="2">已打回</option>
+                        <option value="3">已否决</option>
+                    </select>
+                </div>
+                <button class="pear-btn pear-btn-md pear-btn-primary" lay-submit lay-filter="gasStopBill-query">
+                    <i class="layui-icon layui-icon-search"></i>
+                    查询
+                </button>
+                <button type="reset" class="pear-btn pear-btn-md">
+                    <i class="layui-icon layui-icon-refresh"></i>
+                    重置
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+<div class="layui-card">
+    <div class="layui-card-body">
+        <table id="gasStopBill-table" lay-filter="gasStopBill-table"></table>
+    </div>
+</div>
+</body>
+
+<script type="text/html" id="gasStopBill-toolbar">
+    <button shiro:hasPermission="gasStopBill:apply" class="pear-btn pear-btn-primary pear-btn-md" lay-event="apply">
+        <i class="layui-icon layui-icon-add-1"></i>
+        发起停用申请
+    </button>
+</script>
+
+<script type="text/html" id="gasStopBill-bar">
+    {{# if(d.status == 0){ }}
+    <button shiro:hasPermission="gasStopBill:approve" class="pear-btn pear-btn-primary pear-btn-sm" lay-event="approve" title="签批通过"><i class="layui-icon layui-icon-ok"></i>
+    </button>
+    <button shiro:hasPermission="gasStopBill:rollback" class="pear-btn pear-btn-warming pear-btn-sm" lay-event="rollback" title="退回补充材料"><i class="layui-icon layui-icon-return"></i>
+    </button>
+    <button shiro:hasPermission="gasStopBill:reject" class="pear-btn pear-btn-danger pear-btn-sm" lay-event="reject" title="否决申请"><i class="layui-icon layui-icon-close"></i>
+    </button>
+    {{# } }}
+    {{# if(d.status == 2){ }}
+    <button shiro:hasPermission="gasStopBill:apply" class="pear-btn pear-btn-primary pear-btn-sm" lay-event="resubmit" title="补充材料重新提交"><i class="layui-icon layui-icon-release"></i>
+    </button>
+    {{# } }}
+    <button shiro:hasPermission="gasStopBill:list" class="pear-btn pear-btn-sm" lay-event="records" title="审批履历"><i class="layui-icon layui-icon-log"></i>
+    </button>
+</script>
+
+<script type="text/html" id="gasStopBill-status">
+    {{# if(d.status == 0){ }}
+    <span class="layui-badge layui-bg-blue">在核</span>
+    {{# }else if(d.status == 1){ }}
+    <span class="layui-badge layui-bg-green">已核讫</span>
+    {{# }else if(d.status == 2){ }}
+    <span class="layui-badge layui-bg-orange">已打回</span>
+    {{# }else if(d.status == 3){ }}
+    <span class="layui-badge layui-bg-gray">已否决</span>
+    {{# } }}
+</script>
+
+<script type="text/html" id="gasStopBill-sign">
+    {{d.signCount == null ? 0 : d.signCount}}/{{d.needCount == null ? 1 : d.needCount}}
+</script>
+
+<th:block th:include="include :: footer"/>
+<script>
+    layui.use(['table', 'form', 'jquery'], function () {
+        let table = layui.table;
+        let form = layui.form;
+        let $ = layui.jquery;
+
+        let MODULE_PATH = rootPath+"/gasStopBill/";
+        let cols = [
+            [
+                {title: 'ID', field: 'id', align: 'center', hide: true},
+                {title: '签核单号', field: 'billNo', align: 'left'},
+                {title: '管段代号', field: 'siteNo', align: 'center'},
+                {title: '管段名称', field: 'siteName', align: 'left'},
+                {title: '当前环节', field: 'nodeName', align: 'center'},
+                {title: '本口落印', field: 'signCount', align: 'center', toolbar: '#gasStopBill-sign'},
+                {title: '报批情形', field: 'status', align: 'center', toolbar: '#gasStopBill-status'},
+                {title: '申请理由', field: 'applyReason', align: 'left'},
+                {title: '申请人', field: 'createBy', align: 'center'},
+                {title: '申请时间', field: 'createTime', align: 'center'},
+                {title: '操作', toolbar: '#gasStopBill-bar', align: 'center', width: 180}
+            ]
+        ]
+
+        //table表单列表
+        table.render({
+            elem: '#gasStopBill-table',
+            url: MODULE_PATH + 'list',
+            page: true,
+            method: 'get',
+            cols: cols,
+            skin: 'line',
+            toolbar: '#gasStopBill-toolbar',
+            defaultToolbar: [{
+                layEvent: 'refresh',
+                icon: 'layui-icon-refresh',
+            }, 'filter', 'print', 'exports'],
+            where: {
+                orderByColumn: "id",
+                isAsc: "desc"
+            }
+        });
+
+        //table图标事件绑定
+        table.on('tool(gasStopBill-table)', function (obj) {
+            if (obj.event === 'approve') {
+                window.act(obj.data['id'], 'approve', '签批通过', '审批意见（通过）');
+            } else if (obj.event === 'rollback') {
+                window.act(obj.data['id'], 'rollback', '退回补充材料', '退回原因（请申请人补充的材料）');
+            } else if (obj.event === 'reject') {
+                window.act(obj.data['id'], 'reject', '否决申请', '否决理由');
+            } else if (obj.event === 'resubmit') {
+                window.act(obj.data['id'], 'resubmit', '重新提交', '补充说明（可空，将更新申请理由）');
+            } else if (obj.event === 'records') {
+                window.records(obj.data['id']);
+            }
+        });
+
+        //table工具栏绑定
+        table.on('toolbar(gasStopBill-table)', function (obj) {
+            if (obj.event === 'apply') {
+                window.apply();
+            } else if (obj.event === 'refresh') {
+                window.refresh();
+            }
+        });
+
+        //查询按钮绑定
+        form.on('submit(gasStopBill-query)', function (data) {
+            table.reload('gasStopBill-table', {where: data.field})
+            return false;
+        });
+
+        //发起停用申请
+        window.apply = function () {
+            layer.open({
+                type: 2,
+                title: '发起停用申请',
+                shade: 0.1,
+                area: ['520px', '480px'],
+                content: MODULE_PATH + 'addView'
+            });
+        }
+
+        //过口动作：签批/退回/否决/重新提交（统一录入审批意见）
+        window.act = function (id, action, title, placeholder) {
+            layer.prompt({
+                formType: 2,
+                title: title,
+                area: ['400px', '160px'],
+                placeholder: placeholder
+            }, function (value, index) {
+                layer.close(index);
+                let postData = {id: id};
+                if (action === 'resubmit') {
+                    postData.applyReason = value;
+                } else {
+                    postData.opinion = value;
+                }
+                let loading = layer.load();
+                $.ajax({
+                    url: MODULE_PATH + action,
+                    data: postData,
+                    dataType: 'json',
+                    type: 'post',
+                    success: function (result) {
+                        layer.close(loading);
+                        if (result.code == 200) {
+                            layer.msg(result.msg, {icon: 1, time: 1500}, function () {
+                                table.reload('gasStopBill-table');
+                            });
+                        } else {
+                            layer.msg(result.msg, {icon: 2, time: 1500});
+                        }
+                    }
+                })
+            });
+        }
+
+        //审批履历
+        window.records = function (billId) {
+            layer.open({
+                type: 2,
+                title: '审批履历',
+                shade: 0.1,
+                area: ['720px', '480px'],
+                content: MODULE_PATH + 'recordView?billId=' + billId
+            });
+        }
+
+        //刷新
+        window.refresh = function () {
+            table.reload('gasStopBill-table');
+        }
+    });
+</script>
+</html>
