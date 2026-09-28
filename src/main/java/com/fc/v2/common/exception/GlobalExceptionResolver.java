@@ -110,6 +110,15 @@ public class GlobalExceptionResolver{
     }
     
     /**
+     * 业务异常（工单跳级/已封存等）：直接回写业务消息
+     */
+    @ExceptionHandler(BusinessException.class)
+    public AjaxResult businessException(BusinessException e)
+    {
+        return AjaxResult.error(e.getMessage());
+    }
+
+    /**
      * 拦截未知的运行时异常
      */
     @ExceptionHandler(RuntimeException.class)

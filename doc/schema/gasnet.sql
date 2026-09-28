@@ -146,9 +146,24 @@ CREATE TABLE IF NOT EXISTS t_gas_plan_task (
 CREATE TABLE IF NOT EXISTS t_gas_repair_order (
   id bigint NOT NULL COMMENT '主键',
   biz_no varchar(64) DEFAULT NULL COMMENT '抢修工单号',
-  stage int DEFAULT NULL COMMENT '当前处置段 0..3（接单/抢修/复核/封卡）',
-  status int DEFAULT NULL COMMENT '工单落定 0未起 1在办 2已封存',
-  content varchar(255) DEFAULT NULL COMMENT '工单记事',
+  content varchar(500) DEFAULT NULL COMMENT '险情记事(泄漏位置/险情描述等)',
+  stage int DEFAULT 0 COMMENT '当前处置段 0待接单 1已接单 2抢修中 3待复核 4待封卡 5已封存',
+  status int DEFAULT 0 COMMENT '工单落定 0待接单 1在办 2已封存',
+  owner_id bigint DEFAULT NULL COMMENT '负责人 t_sys_user.id(超期预警接收人)',
+  owner varchar(64) DEFAULT NULL COMMENT '负责人登录名(快照)',
+  owner_name varchar(64) DEFAULT NULL COMMENT '负责人姓名(快照)',
+  assignee_id bigint DEFAULT NULL COMMENT '接单巡检员 t_sys_user.id',
+  assignee varchar(64) DEFAULT NULL COMMENT '接单人登录名(快照)',
+  assignee_name varchar(64) DEFAULT NULL COMMENT '接单人姓名(快照)',
+  due_at datetime DEFAULT NULL COMMENT '处置时限(超期未封卡即预警)',
+  repair_result varchar(1000) DEFAULT NULL COMMENT '抢修结果(处置措施/换件/恢复供气等)',
+  claim_time datetime DEFAULT NULL COMMENT '接单时间',
+  start_time datetime DEFAULT NULL COMMENT '开始抢修时间',
+  submit_time datetime DEFAULT NULL COMMENT '提交抢修结果时间',
+  review_time datetime DEFAULT NULL COMMENT '现场复核时间',
+  seal_time datetime DEFAULT NULL COMMENT '完工封卡时间',
+  warn_count int DEFAULT 0 COMMENT '超期预警已发次数',
+  last_warn_time datetime DEFAULT NULL COMMENT '最近一次超期预警时间(24小时内不重复提醒)',
   last_action varchar(64) DEFAULT NULL COMMENT '最近一次过口动作',
   del_flag int DEFAULT '0' COMMENT '删除标记 0正常 1删除',
   create_by varchar(64) DEFAULT NULL COMMENT '创建者',
@@ -156,8 +171,25 @@ CREATE TABLE IF NOT EXISTS t_gas_repair_order (
   update_by varchar(64) DEFAULT NULL COMMENT '更新者',
   update_time datetime DEFAULT NULL COMMENT '更新时间',
   remark varchar(500) DEFAULT NULL COMMENT '备注',
-  PRIMARY KEY (id)
+  PRIMARY KEY (id),
+  KEY idx_gas_repair_stage (status, stage),
+  KEY idx_gas_repair_due (due_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='抢修工单';
+
+CREATE TABLE IF NOT EXISTS t_gas_repair_order_record (
+  id bigint NOT NULL COMMENT '主键',
+  order_id bigint DEFAULT NULL COMMENT '抢修工单 t_gas_repair_order.id',
+  biz_no varchar(64) DEFAULT NULL COMMENT '抢修工单号(冗余)',
+  stage int DEFAULT NULL COMMENT '动作发生时所处段 0接单 1开始抢修 2提交抢修结果 3现场复核 4完工封卡',
+  stage_name varchar(32) DEFAULT NULL COMMENT '环节名快照(接单/开始抢修/提交抢修结果/现场复核/完工封卡)',
+  action int DEFAULT NULL COMMENT '过口动作 0接单 1开始抢修 2提交抢修结果 3现场复核 4完工封卡',
+  operator varchar(64) DEFAULT NULL COMMENT '操作人登录名',
+  operator_name varchar(64) DEFAULT NULL COMMENT '操作人姓名(快照)',
+  opinion varchar(500) DEFAULT NULL COMMENT '操作备注',
+  create_time datetime DEFAULT NULL COMMENT '操作时间',
+  PRIMARY KEY (id),
+  KEY idx_gas_repair_record_order (order_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='抢修工单处置履历(只增不改)';
 
 CREATE TABLE IF NOT EXISTS t_gas_stop_bill (
   id bigint NOT NULL COMMENT '主键',

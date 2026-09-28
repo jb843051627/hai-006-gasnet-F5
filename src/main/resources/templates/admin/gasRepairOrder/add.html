@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:include="include :: header('新建抢修工单')"/>
+</head>
+<body>
+<form class="layui-form">
+    <div class="mainBox">
+        <div class="main-container">
+            <div class="layui-form-item">
+                <label class="layui-form-label">险情描述</label>
+                <div class="layui-input-block">
+                    <textarea name="content" placeholder="发生地点、泄漏/险情情况、现场警戒疏散情况等"
+                              class="layui-textarea" lay-verify="required"></textarea>
+                </div>
+            </div>
+
+            <div class="layui-form-item">
+                <label class="layui-form-label">负责人</label>
+                <div class="layui-input-block">
+                    <select name="ownerId" lay-verify="required">
+                        <option value="">请选择负责人（超期预警接收人）</option>
+                        <option th:each="user : ${owners}" th:value="${user.id}"
+                                th:text="${user.username + ' ' + (user.nickname == null ? '' : user.nickname)}"></option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="layui-form-item">
+                <label class="layui-form-label">处置时限</label>
+                <div class="layui-input-inline">
+                    <input type="text" name="dueAt" id="dueAt" placeholder="yyyy-MM-dd HH:mm:ss"
+                           class="layui-input" autocomplete="off">
+                </div>
+                <div class="layui-form-mid layui-word-aux">超过该时间仍未封卡将自动预警，可空</div>
+            </div>
+
+            <div class="layui-form-item">
+                <label class="layui-form-label">备注</label>
+                <div class="layui-input-block">
+                    <textarea name="remark" placeholder="其他说明（可空）" class="layui-textarea"></textarea>
+                </div>
+            </div>
+
+            <div class="layui-form-item">
+                <div class="layui-input-block">
+                    <span class="layui-font-12" style="color:#999">建单后工单处于“待接单”，由巡检员依次完成
+                        接单 → 开始抢修 → 提交抢修结果 → 现场复核 → 完工封卡，各阶段不得跳级；封卡后永久封存。</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="bottom">
+        <div class="button-container">
+            <button type="submit" class="layui-btn layui-btn-normal layui-btn-sm" lay-submit="" lay-filter="gasRepairOrder-add">
+                <i class="layui-icon layui-icon-ok"></i>
+                创建工单
+            </button>
+        </div>
+    </div>
+</form>
+<th:block th:include="include :: footer"/>
+<script>
+    layui.use(['form', 'jquery', 'laydate'], function () {
+        let form = layui.form;
+        let $ = layui.jquery;
+        let laydate = layui.laydate;
+        let MODULE_PATH = rootPath + "/gasRepairOrder";
+
+        //处置时限：精确到分钟，提交格式 yyyy-MM-dd HH:mm:ss
+        laydate.render({
+            elem: '#dueAt',
+            type: 'datetime',
+            format: 'yyyy-MM-dd HH:mm:ss'
+        });
+
+        //创建工单
+        form.on('submit(gasRepairOrder-add)', function (data) {
+            let loading = layer.load();
+            $.ajax({
+                url: MODULE_PATH + '/add',
+                data: data.field,
+                dataType: 'json',
+                contentType: 'application/x-www-form-urlencoded',
+                type: 'post',
+                success: function (result) {
+                    layer.close(loading);
+                    if (result.code == 200) {
+                        layer.msg(result.msg, {icon: 1, time: 1000}, function () {
+                            parent.layer.close(parent.layer.getFrameIndex(window.name));//关闭当前页
+                            parent.layui.table.reload("gasRepairOrder-table");
+                        });
+                    } else {
+                        layer.msg(result.msg, {icon: 2, time: 2000});
+                    }
+                }
+            })
+            return false;
+        });
+    })
+</script>
+</body>
+</html>

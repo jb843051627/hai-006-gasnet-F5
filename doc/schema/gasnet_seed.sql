@@ -52,3 +52,27 @@ VALUES (7001, 'SB20260926000001', 0, 'GP00', '管段服役已满设计寿命，�
 -- 停用申请审批履历演示：7001 的运维提交留痕（action 0提交 1通过 2退回补充 3否决）
 INSERT IGNORE INTO t_gas_stop_bill_record (id, bill_id, bill_no, node_no, node_name, action, approver, opinion, create_time)
 VALUES (7001, 7001, 'SB20260926000001', 0, '运维申请', 0, 'seed', '管段服役已满设计寿命，近期泄漏普测浓度持续偏高，存在重大安全隐患，申请停用。', NOW());
+
+-- 抢修工单超期预警定时任务：每小时扫描处置时限已过仍未封卡的工单（status 0正常 1暂停）
+INSERT IGNORE INTO t_sys_quartz_job (id, job_name, job_group, invoke_target, cron_expression, misfire_policy, concurrent, status, create_by, create_time, remark)
+VALUES (9003, '抢修工单超期预警', 'GASNET', 'gasRepairOrderWarnTask.scanOverdue()', '0 0 * * * ?', '2', '1', 0, 'seed', NOW(), '每小时扫描处置时限已过仍未完工封卡的抢修工单，站内信提醒负责人/接单人督促处置，同一工单24小时内不重复提醒');
+
+-- 抢修工单处置流程演示：
+-- 6001 城东调压站燃气泄漏，超期未接单（待接单，时限已过，预警目标）
+-- 6002 庭院管被施工挖破，已接单并开始抢修（抢修中）
+-- 6003 阀门井微漏，处置完成已完工封卡（终态，永久封存）
+-- stage 0待接单 1已接单 2抢修中 3待复核 4待封卡 5已封存；status 0待接单 1在办 2已封存
+INSERT IGNORE INTO t_gas_repair_order (id, biz_no, content, stage, status, owner_id, owner, owner_name, assignee_id, assignee, assignee_name, due_at, repair_result, claim_time, start_time, submit_time, review_time, seal_time, warn_count, last_warn_time, last_action, del_flag, create_by, create_time, remark)
+VALUES (6001, 'RO20260928090001', '城东区东湖街调压站调压器法兰处燃气泄漏，现场有明显臭剂味，已警戒疏散', 0, 0, 1, 'admin', '管理员', NULL, NULL, NULL, DATE_SUB(NOW(), INTERVAL 2 HOUR), NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, 0, 'seed', NOW(), '超期未接单，定时任务将预警负责人'),
+       (6002, 'RO20260928100002', '城南片区庭院管被第三方施工挖破，中压泄漏，已关阀降压', 2, 1, 1, 'admin', '管理员', 1, 'admin', '管理员', DATE_ADD(NOW(), INTERVAL 6 HOUR), NULL, DATE_SUB(NOW(), INTERVAL 90 MINUTE), DATE_SUB(NOW(), INTERVAL 30 MINUTE), NULL, NULL, NULL, 0, NULL, '开始抢修', 0, 'seed', DATE_SUB(NOW(), INTERVAL 100 MINUTE), '抢修进行中'),
+       (6003, 'RO20260928110003', '城北小区阀门井接头微漏', 5, 2, 1, 'admin', '管理员', 1, 'admin', '管理员', DATE_SUB(NOW(), INTERVAL 1 DAY), '更换密封圈并复紧接头，气密性试验合格，恢复正常供气', DATE_SUB(NOW(), INTERVAL 30 HOUR), DATE_SUB(NOW(), INTERVAL 29 HOUR), DATE_SUB(NOW(), INTERVAL 26 HOUR), DATE_SUB(NOW(), INTERVAL 25 HOUR), DATE_SUB(NOW(), INTERVAL 24 HOUR), 0, NULL, '完工封卡', 0, 'seed', DATE_SUB(NOW(), INTERVAL 32 HOUR), '已完工封卡，记录永久封存');
+
+-- 抢修工单处置履历演示：6002 已走到开始抢修；6003 五段履历齐全（action 0接单 1开始抢修 2提交抢修结果 3现场复核 4完工封卡）
+INSERT IGNORE INTO t_gas_repair_order_record (id, order_id, biz_no, stage, stage_name, action, operator, operator_name, opinion, create_time)
+VALUES (600201, 6002, 'RO20260928100002', 0, '接单', 0, 'admin', '管理员', '已电话核实险情，即刻赶赴现场', DATE_SUB(NOW(), INTERVAL 90 MINUTE)),
+       (600202, 6002, 'RO20260928100002', 1, '开始抢修', 1, 'admin', '管理员', '关闭上游阀门降压，开挖工作面', DATE_SUB(NOW(), INTERVAL 30 MINUTE)),
+       (600301, 6003, 'RO20260928110003', 0, '接单', 0, 'admin', '管理员', '接单前往', DATE_SUB(NOW(), INTERVAL 30 HOUR)),
+       (600302, 6003, 'RO20260928110003', 1, '开始抢修', 1, 'admin', '管理员', '拆除保温层查漏点', DATE_SUB(NOW(), INTERVAL 29 HOUR)),
+       (600303, 6003, 'RO20260928110003', 2, '提交抢修结果', 2, 'admin', '管理员', '更换密封圈并复紧接头，气密试验合格', DATE_SUB(NOW(), INTERVAL 26 HOUR)),
+       (600304, 6003, 'RO20260928110003', 3, '现场复核', 3, 'admin', '管理员', '现场复核浓度检测正常，复核通过', DATE_SUB(NOW(), INTERVAL 25 HOUR)),
+       (600305, 6003, 'RO20260928110003', 4, '完工封卡', 4, 'admin', '管理员', '资料齐全，准予封卡', DATE_SUB(NOW(), INTERVAL 24 HOUR));
