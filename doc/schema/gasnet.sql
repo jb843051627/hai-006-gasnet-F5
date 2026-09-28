@@ -143,21 +143,64 @@ CREATE TABLE IF NOT EXISTS t_gas_plan_task (
   KEY idx_gas_plan_task_site (site_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='巡检计划到期任务派单';
 
+-- 抢修工单五段处置：待接单→已接单→抢修中→待复核→复核通过→已封卡，仅允许逐段推进不得跳级。
+-- 完工封卡(status=2)后由应用层与库级触发器双重封存，禁止任何改删（见文件末尾触发器）。
 CREATE TABLE IF NOT EXISTS t_gas_repair_order (
   id bigint NOT NULL COMMENT '主键',
-  biz_no varchar(64) DEFAULT NULL COMMENT '抢修工单号',
-  stage int DEFAULT NULL COMMENT '当前处置段 0..3（接单/抢修/复核/封卡）',
-  status int DEFAULT NULL COMMENT '工单落定 0未起 1在办 2已封存',
-  content varchar(255) DEFAULT NULL COMMENT '工单记事',
-  last_action varchar(64) DEFAULT NULL COMMENT '最近一次过口动作',
+  biz_no varchar(64) NOT NULL COMMENT '抢修工单号',
+  source int DEFAULT 0 COMMENT '工单来源 0巡检上报 1群众报修 2应急接警',
+  site_no varchar(64) DEFAULT NULL COMMENT '涉气管段/设施编号(可空)',
+  site_name varchar(255) DEFAULT NULL COMMENT '泄漏/险情发生地点',
+  leak_level int DEFAULT 1 COMMENT '紧急程度 0一般 1紧急 2特急',
+  content varchar(1000) DEFAULT NULL COMMENT '险情描述/工单记事',
+  contact_person varchar(64) DEFAULT NULL COMMENT '报告/现场联系人',
+  contact_phone varchar(32) DEFAULT NULL COMMENT '联系电话',
+  owner_id bigint DEFAULT NULL COMMENT '负责人用户id(接单前为指派负责人,接单后为接单巡检员)',
+  owner_name varchar(64) DEFAULT NULL COMMENT '负责人姓名(冗余)',
+  stage int NOT NULL DEFAULT 0 COMMENT '当前处置段 0待接单 1已接单 2抢修中 3待复核 4复核通过 5已封卡',
+  status int NOT NULL DEFAULT 0 COMMENT '工单状态 0待接单(未起) 1在办 2已封卡(永久封存)',
+  accept_by varchar(64) DEFAULT NULL COMMENT '接单巡检员(登录名)',
+  accept_time datetime DEFAULT NULL COMMENT '接单时间',
+  repair_start_by varchar(64) DEFAULT NULL COMMENT '开始抢修操作人',
+  repair_start_time datetime DEFAULT NULL COMMENT '开始抢修时间',
+  repair_result varchar(2000) DEFAULT NULL COMMENT '抢修结果(处置措施/更换部件/复测情况)',
+  submit_by varchar(64) DEFAULT NULL COMMENT '提交抢修结果操作人',
+  submit_time datetime DEFAULT NULL COMMENT '提交抢修结果时间',
+  review_by varchar(64) DEFAULT NULL COMMENT '现场复核操作人',
+  review_time datetime DEFAULT NULL COMMENT '现场复核时间',
+  review_remark varchar(1000) DEFAULT NULL COMMENT '现场复核意见',
+  seal_by varchar(64) DEFAULT NULL COMMENT '完工封卡操作人',
+  seal_time datetime DEFAULT NULL COMMENT '完工封卡时间',
+  due_at datetime DEFAULT NULL COMMENT '办结时限(超过即超期预警)',
+  warn_count int DEFAULT 0 COMMENT '已发超期预警次数',
+  last_warn_time datetime DEFAULT NULL COMMENT '最近一次超期预警时间(同单24小时内不重复提醒)',
   del_flag int DEFAULT '0' COMMENT '删除标记 0正常 1删除',
   create_by varchar(64) DEFAULT NULL COMMENT '创建者',
   create_time datetime DEFAULT NULL COMMENT '创建时间',
   update_by varchar(64) DEFAULT NULL COMMENT '更新者',
   update_time datetime DEFAULT NULL COMMENT '更新时间',
   remark varchar(500) DEFAULT NULL COMMENT '备注',
-  PRIMARY KEY (id)
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_gas_repair_biz_no (biz_no),
+  KEY idx_gas_repair_stage (stage, status, del_flag),
+  KEY idx_gas_repair_due (due_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='抢修工单';
+
+-- 抢修工单处置履历：只增不改不删（库级触发器兜底），每一处置段落一条，
+-- 记录操作人、操作时间、备注与当时所处环节，保障抢修记录真实可溯。
+CREATE TABLE IF NOT EXISTS t_gas_repair_order_record (
+  id bigint NOT NULL COMMENT '主键',
+  order_id bigint NOT NULL COMMENT '抢修工单 t_gas_repair_order.id',
+  biz_no varchar(64) DEFAULT NULL COMMENT '抢修工单号(冗余)',
+  stage int DEFAULT NULL COMMENT '动作完成后所处处置段 0待接单 1已接单 2抢修中 3待复核 4复核通过 5已封卡',
+  stage_name varchar(32) DEFAULT NULL COMMENT '处置段名快照(待接单/已接单/抢修中/待复核/复核通过/已封卡)',
+  action int DEFAULT NULL COMMENT '过口动作 0创建 1接单 2开始抢修 3提交抢修结果 4现场复核 5完工封卡',
+  operator varchar(64) DEFAULT NULL COMMENT '操作人(登录名)',
+  remark varchar(1000) DEFAULT NULL COMMENT '操作备注/处置说明',
+  create_time datetime DEFAULT NULL COMMENT '操作时间',
+  PRIMARY KEY (id),
+  KEY idx_gas_repair_record_order (order_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='抢修工单处置履历';
 
 CREATE TABLE IF NOT EXISTS t_gas_stop_bill (
   id bigint NOT NULL COMMENT '主键',
@@ -227,3 +270,51 @@ INSERT IGNORE INTO t_gas_pipe (id, site_no, site_name, site_type, road_name, th1
 VALUES (0, 'GP00', '青坪市城区中压主干管段（在用）', '管道', '青坪省—青坪市—城东区—东湖街道', 30.00, 80.00, 200.00, 0, 0, 'seed', NOW()),
        (1, 'GP01', '青坪市城东调压站（已退役）', '调压站', '青坪省—青坪市—城东区—东湖街道', 30.00, 80.00, 200.00, 1, 0, 'seed', NOW());
 
+
+-- ============================================================================
+-- 不可篡改兜底：库级触发器（应用层状态机之外的第二道封存，防止直连库改数）
+-- 1) 已完工封卡的抢修工单(status=2)禁止 UPDATE/DELETE；
+-- 2) 处置履历表只增不改不删。
+-- 含 IF 复合语句，须用 mysql 客户端按 DELIMITER 分段执行；
+-- JDBC/程序化执行时请逐触发器发送（语句体内含分号）。
+-- ============================================================================
+DROP TRIGGER IF EXISTS trg_gas_repair_order_no_update_sealed;
+DROP TRIGGER IF EXISTS trg_gas_repair_order_no_delete_sealed;
+DROP TRIGGER IF EXISTS trg_gas_repair_record_no_update;
+DROP TRIGGER IF EXISTS trg_gas_repair_record_no_delete;
+
+DELIMITER //
+
+CREATE TRIGGER trg_gas_repair_order_no_update_sealed
+BEFORE UPDATE ON t_gas_repair_order
+FOR EACH ROW
+BEGIN
+    IF OLD.status = 2 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '该抢修工单已完工封卡，永久封存，不得修改任何内容';
+    END IF;
+END//
+
+CREATE TRIGGER trg_gas_repair_order_no_delete_sealed
+BEFORE DELETE ON t_gas_repair_order
+FOR EACH ROW
+BEGIN
+    IF OLD.status = 2 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '该抢修工单已完工封卡，永久封存，不得删除';
+    END IF;
+END//
+
+CREATE TRIGGER trg_gas_repair_record_no_update
+BEFORE UPDATE ON t_gas_repair_order_record
+FOR EACH ROW
+BEGIN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '抢修处置履历只增不改，禁止更新';
+END//
+
+CREATE TRIGGER trg_gas_repair_record_no_delete
+BEFORE DELETE ON t_gas_repair_order_record
+FOR EACH ROW
+BEGIN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '抢修处置履历只增不删，禁止删除';
+END//
+
+DELIMITER ;

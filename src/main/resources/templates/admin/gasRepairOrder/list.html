@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('抢修工单流转台账')"/>
+</head>
+<body class="pear-container">
+<div class="layui-card">
+    <div class="layui-card-body">
+        <form class="layui-form" action="">
+            <div class="layui-form-item">
+                <label class="layui-form-label">工单号</label>
+                <div class="layui-input-inline">
+                    <input type="text" name="bizNo" placeholder="" class="layui-input">
+                </div>
+
+                <label class="layui-form-label">险情地点</label>
+                <div class="layui-input-inline">
+                    <input type="text" name="siteName" placeholder="" class="layui-input">
+                </div>
+
+                <label class="layui-form-label">处置段</label>
+                <div class="layui-input-inline">
+                    <select name="stage">
+                        <option value="">全部</option>
+                        <option value="0">待接单</option>
+                        <option value="1">已接单</option>
+                        <option value="2">抢修中</option>
+                        <option value="3">待复核</option>
+                        <option value="4">复核通过</option>
+                        <option value="5">已封卡</option>
+                    </select>
+                </div>
+
+                <label class="layui-form-label">工单状态</label>
+                <div class="layui-input-inline">
+                    <select name="status">
+                        <option value="">全部</option>
+                        <option value="0">待接单</option>
+                        <option value="1">在办</option>
+                        <option value="2">已封卡</option>
+                    </select>
+                </div>
+
+                <label class="layui-form-label">超期</label>
+                <div class="layui-input-inline" style="width:110px">
+                    <select name="overdueOnly">
+                        <option value="">全部</option>
+                        <option value="1">只看超期</option>
+                    </select>
+                </div>
+                <button class="pear-btn pear-btn-md pear-btn-primary" lay-submit lay-filter="gasRepairOrder-query">
+                    <i class="layui-icon layui-icon-search"></i>
+                    查询
+                </button>
+                <button type="reset" class="pear-btn pear-btn-md">
+                    <i class="layui-icon layui-icon-refresh"></i>
+                    重置
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+<div class="layui-card">
+    <div class="layui-card-body">
+        <table id="gasRepairOrder-table" lay-filter="gasRepairOrder-table"></table>
+    </div>
+</div>
+</body>
+
+<script type="text/html" id="gasRepairOrder-toolbar">
+    <button shiro:hasPermission="gasRepairOrder:create" class="pear-btn pear-btn-primary pear-btn-md" lay-event="create">
+        <i class="layui-icon layui-icon-add-1"></i>
+        新建抢修工单
+    </button>
+</script>
+
+<script type="text/html" id="gasRepairOrder-bar">
+    {{# if(d.stage == 0){ }}
+    <button shiro:hasPermission="gasRepairOrder:accept" class="pear-btn pear-btn-primary pear-btn-sm" lay-event="accept" title="接单（巡检员领取工单）"><i class="layui-icon layui-icon-username"></i></button>
+    {{# } }}
+    {{# if(d.stage == 1){ }}
+    <button shiro:hasPermission="gasRepairOrder:repair" class="pear-btn pear-btn-primary pear-btn-sm" lay-event="startRepair" title="开始抢修"><i class="layui-icon layui-icon-play"></i></button>
+    {{# } }}
+    {{# if(d.stage == 2){ }}
+    <button shiro:hasPermission="gasRepairOrder:repair" class="pear-btn pear-btn-primary pear-btn-sm" lay-event="submitResult" title="提交抢修结果"><i class="layui-icon layui-icon-edit"></i></button>
+    {{# } }}
+    {{# if(d.stage == 3){ }}
+    <button shiro:hasPermission="gasRepairOrder:review" class="pear-btn pear-btn-sm" style="background:#5FB878;color:#fff" lay-event="reviewPass" title="现场复核通过"><i class="layui-icon layui-icon-ok"></i></button>
+    <button shiro:hasPermission="gasRepairOrder:review" class="pear-btn pear-btn-warming pear-btn-sm" lay-event="reviewReject" title="复核不通过，退回抢修"><i class="layui-icon layui-icon-return"></i></button>
+    {{# } }}
+    {{# if(d.stage == 4){ }}
+    <button shiro:hasPermission="gasRepairOrder:seal" class="pear-btn pear-btn-danger pear-btn-sm" lay-event="seal" title="完工封卡（封卡后永久封存）"><i class="layui-icon layui-icon-auz"></i></button>
+    {{# } }}
+    {{# if(d.stage != 5){ }}
+    <button shiro:hasPermission="gasRepairOrder:edit" class="pear-btn pear-btn-sm" lay-event="editContent" title="修改记事"><i class="layui-icon layui-icon-fonts-strong"></i></button>
+    <button shiro:hasPermission="gasRepairOrder:remove" class="pear-btn pear-btn-danger pear-btn-sm" lay-event="remove" title="删除"><i class="layui-icon layui-icon-delete"></i></button>
+    {{# } }}
+    <button shiro:hasPermission="gasRepairOrder:list" class="pear-btn pear-btn-sm" lay-event="records" title="处置履历"><i class="layui-icon layui-icon-log"></i></button>
+</script>
+
+<script type="text/html" id="gasRepairOrder-stage">
+    {{# if(d.stage == 0){ }}
+    <span class="layui-badge layui-bg-gray">待接单</span>
+    {{# }else if(d.stage == 1){ }}
+    <span class="layui-badge layui-bg-blue">已接单</span>
+    {{# }else if(d.stage == 2){ }}
+    <span class="layui-badge layui-bg-orange">抢修中</span>
+    {{# }else if(d.stage == 3){ }}
+    <span class="layui-badge layui-bg-cyan">待复核</span>
+    {{# }else if(d.stage == 4){ }}
+    <span class="layui-badge layui-bg-green">复核通过</span>
+    {{# }else if(d.stage == 5){ }}
+    <span class="layui-badge">已封卡</span>
+    {{# } }}
+</script>
+
+<script type="text/html" id="gasRepairOrder-status">
+    {{# if(d.status == 0){ }}
+    <span class="layui-badge layui-bg-gray">待接单</span>
+    {{# }else if(d.status == 1){ }}
+    <span class="layui-badge layui-bg-blue">在办</span>
+    {{# }else if(d.status == 2){ }}
+    <span class="layui-badge">已封卡</span>
+    {{# } }}
+</script>
+
+<script type="text/html" id="gasRepairOrder-level">
+    {{# if(d.leakLevel == 2){ }}
+    <span class="layui-badge">特急</span>
+    {{# }else if(d.leakLevel == 1){ }}
+    <span class="layui-badge layui-bg-orange">紧急</span>
+    {{# }else{ }}
+    <span class="layui-badge layui-bg-gray">一般</span>
+    {{# } }}
+</script>
+
+<script type="text/html" id="gasRepairOrder-overdue">
+    {{# if(d.overdueDays > 0){ }}
+    <span class="layui-badge">超期{{d.overdueDays}}天</span>
+    {{# }else{ }}
+    <span>-</span>
+    {{# } }}
+</script>
+
+<th:block th:include="include :: footer"/>
+<script>
+    layui.use(['table', 'form', 'jquery'], function () {
+        let table = layui.table;
+        let form = layui.form;
+        let $ = layui.jquery;
+
+        let MODULE_PATH = rootPath + "/gasRepairOrder/";
+        let cols = [
+            [
+                {title: 'ID', field: 'id', align: 'center', hide: true},
+                {title: '工单号', field: 'bizNo', align: 'left', width: 180},
+                {title: '紧急程度', field: 'leakLevel', align: 'center', width: 90, toolbar: '#gasRepairOrder-level'},
+                {title: '险情地点', field: 'siteName', align: 'left'},
+                {title: '设施编号', field: 'siteNo', align: 'center', width: 110},
+                {title: '处置段', field: 'stage', align: 'center', width: 100, toolbar: '#gasRepairOrder-stage'},
+                {title: '状态', field: 'status', align: 'center', width: 90, toolbar: '#gasRepairOrder-status'},
+                {title: '负责人', field: 'ownerName', align: 'center', width: 100},
+                {title: '办结时限', field: 'dueAt', align: 'center', width: 160},
+                {title: '超期', field: 'overdueDays', align: 'center', width: 100, toolbar: '#gasRepairOrder-overdue'},
+                {title: '预警次数', field: 'warnCount', align: 'center', width: 90},
+                {title: '建单人', field: 'createBy', align: 'center', width: 100},
+                {title: '建单时间', field: 'createTime', align: 'center', width: 160},
+                {title: '操作', toolbar: '#gasRepairOrder-bar', align: 'center', width: 200, fixed: 'right'}
+            ]
+        ];
+
+        //table表单列表
+        table.render({
+            elem: '#gasRepairOrder-table',
+            url: MODULE_PATH + 'list',
+            page: true,
+            method: 'get',
+            cols: cols,
+            skin: 'line',
+            toolbar: '#gasRepairOrder-toolbar',
+            defaultToolbar: [{
+                layEvent: 'refresh',
+                icon: 'layui-icon-refresh'
+            }, 'filter', 'print', 'exports']
+        });
+
+        //table图标事件绑定
+        table.on('tool(gasRepairOrder-table)', function (obj) {
+            if (obj.event === 'accept') {
+                window.act(obj.data['id'], 'accept', '接单', '接单备注（可空）');
+            } else if (obj.event === 'startRepair') {
+                window.act(obj.data['id'], 'startRepair', '开始抢修', '开工说明（可空）');
+            } else if (obj.event === 'submitResult') {
+                window.submitResult(obj.data['id']);
+            } else if (obj.event === 'reviewPass') {
+                window.act(obj.data['id'], 'review', '现场复核通过', '现场复核意见（必填）', {passed: true});
+            } else if (obj.event === 'reviewReject') {
+                window.act(obj.data['id'], 'review', '复核不通过，退回抢修', '退回原因与返工要求（必填）', {passed: false});
+            } else if (obj.event === 'seal') {
+                window.seal(obj.data['id']);
+            } else if (obj.event === 'editContent') {
+                window.editContent(obj.data['id'], obj.data['content']);
+            } else if (obj.event === 'remove') {
+                window.remove(obj.data['id']);
+            } else if (obj.event === 'records') {
+                window.records(obj.data['id']);
+            }
+        });
+
+        //table工具栏绑定
+        table.on('toolbar(gasRepairOrder-table)', function (obj) {
+            if (obj.event === 'create') {
+                window.create();
+            } else if (obj.event === 'refresh') {
+                window.refresh();
+            }
+        });
+
+        //查询按钮绑定
+        form.on('submit(gasRepairOrder-query)', function (data) {
+            table.reload('gasRepairOrder-table', {where: data.field, page: {curr: 1}});
+            return false;
+        });
+
+        //新建抢修工单
+        window.create = function () {
+            layer.open({
+                type: 2,
+                title: '新建抢修工单',
+                shade: 0.1,
+                area: ['640px', '620px'],
+                content: MODULE_PATH + 'addView'
+            });
+        };
+
+        //过口动作：接单/开工/复核（统一录入备注，extra 携带额外参数）
+        window.act = function (id, action, title, placeholder, extra) {
+            layer.prompt({
+                formType: 2,
+                title: title,
+                area: ['420px', '170px'],
+                placeholder: placeholder
+            }, function (value, index) {
+                layer.close(index);
+                let postData = {id: id, remark: value};
+                if (action === 'review') {
+                    postData = {id: id, passed: extra.passed, reviewRemark: value};
+                }
+                window.postAction(action, title, postData);
+            });
+        };
+
+        //提交抢修结果：抢修结果必填且内容较长，单独弹层
+        window.submitResult = function (id) {
+            layer.prompt({
+                formType: 2,
+                title: '提交抢修结果',
+                area: ['460px', '240px'],
+                placeholder: '抢修结果（必填）：处置措施、更换部件、泄漏复测情况等'
+            }, function (value, index) {
+                layer.close(index);
+                window.postAction('submitResult', '提交抢修结果', {id: id, repairResult: value});
+            });
+        };
+
+        //完工封卡：二次确认，强调永久封存
+        window.seal = function (id) {
+            layer.confirm('完工封卡后该工单将永久封存，任何内容不得再修改或删除。确认封卡？', {
+                title: '完工封卡确认', icon: 3
+            }, function (index) {
+                layer.close(index);
+                layer.prompt({
+                    formType: 2,
+                    title: '完工封卡',
+                    area: ['420px', '160px'],
+                    placeholder: '封卡备注（可空）'
+                }, function (value, idx2) {
+                    layer.close(idx2);
+                    window.postAction('seal', '完工封卡', {id: id, remark: value});
+                });
+            });
+        };
+
+        //修改记事
+        window.editContent = function (id, content) {
+            layer.prompt({
+                formType: 2,
+                title: '修改工单记事',
+                area: ['420px', '200px'],
+                value: content || ''
+            }, function (value, index) {
+                layer.close(index);
+                window.postAction('editContent', '修改记事', {id: id, content: value});
+            });
+        };
+
+        //删除：已封卡工单服务端会拒绝
+        window.remove = function (id) {
+            layer.confirm('确认删除该抢修工单？已完工封卡的工单不允许删除。', {
+                title: '删除确认', icon: 3
+            }, function (index) {
+                layer.close(index);
+                window.postAction('remove', '删除', {id: id});
+            });
+        };
+
+        //统一 POST 过口
+        window.postAction = function (action, title, postData) {
+            let loading = layer.load();
+            $.ajax({
+                url: MODULE_PATH + action,
+                data: postData,
+                dataType: 'json',
+                type: 'post',
+                success: function (result) {
+                    layer.close(loading);
+                    if (result.code == 200) {
+                        layer.msg(result.msg || (title + '成功'), {icon: 1, time: 1500}, function () {
+                            table.reload('gasRepairOrder-table');
+                        });
+                    } else {
+                        layer.msg(result.msg || (title + '失败'), {icon: 2, time: 2500});
+                    }
+                },
+                error: function () {
+                    layer.close(loading);
+                    layer.msg('网络异常，请重试', {icon: 2});
+                }
+            });
+        };
+
+        //处置履历
+        window.records = function (id) {
+            layer.open({
+                type: 2,
+                title: '处置履历',
+                shade: 0.1,
+                area: ['820px', '500px'],
+                content: MODULE_PATH + 'recordView?orderId=' + id
+            });
+        };
+
+        //刷新
+        window.refresh = function () {
+            table.reload('gasRepairOrder-table');
+        };
+    });
+</script>
+</html>

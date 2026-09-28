@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:include="include :: header('新建抢修工单')"/>
+</head>
+<body>
+<form class="layui-form">
+    <div class="mainBox">
+        <div class="main-container">
+            <div class="layui-form-item">
+                <label class="layui-form-label">工单来源</label>
+                <div class="layui-input-block">
+                    <input type="radio" name="source" value="0" title="巡检上报" checked>
+                    <input type="radio" name="source" value="1" title="群众报修">
+                    <input type="radio" name="source" value="2" title="应急接警">
+                </div>
+            </div>
+
+            <div class="layui-form-item">
+                <label class="layui-form-label">紧急程度</label>
+                <div class="layui-input-block">
+                    <input type="radio" name="leakLevel" value="0" title="一般">
+                    <input type="radio" name="leakLevel" value="1" title="紧急" checked>
+                    <input type="radio" name="leakLevel" value="2" title="特急">
+                </div>
+            </div>
+
+            <div class="layui-form-item">
+                <label class="layui-form-label">设施编号</label>
+                <div class="layui-input-block">
+                    <input type="text" name="siteNo" placeholder="涉气管段/设施编号（选填，与地点至少填一项）"
+                           class="layui-input">
+                </div>
+            </div>
+
+            <div class="layui-form-item">
+                <label class="layui-form-label">险情地点</label>
+                <div class="layui-input-block">
+                    <input type="text" name="siteName" placeholder="燃气泄漏/紧急情况发生地点"
+                           class="layui-input" lay-verify="required">
+                </div>
+            </div>
+
+            <div class="layui-form-item">
+                <label class="layui-form-label">联系人/电话</label>
+                <div class="layui-input-inline" style="width:150px">
+                    <input type="text" name="contactPerson" placeholder="报告/现场联系人" class="layui-input">
+                </div>
+                <div class="layui-input-inline" style="width:160px">
+                    <input type="text" name="contactPhone" placeholder="联系电话" class="layui-input">
+                </div>
+            </div>
+
+            <div class="layui-form-item">
+                <label class="layui-form-label">指派负责人</label>
+                <div class="layui-input-block">
+                    <select name="ownerId">
+                        <option value="">暂不指派，等待巡检员主动接单</option>
+                        <option th:each="u : ${owners}" th:value="${u.id}"
+                                th:text="${u.username + '（' + (u.nickname == null ? u.username : u.nickname) + '）'}"></option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="layui-form-item">
+                <label class="layui-form-label">办结时限</label>
+                <div class="layui-input-block">
+                    <input type="text" id="dueAt" name="dueAt" placeholder="超时未办结将自动预警（选填）"
+                           class="layui-input" style="width:220px">
+                </div>
+            </div>
+
+            <div class="layui-form-item">
+                <label class="layui-form-label">险情描述</label>
+                <div class="layui-input-block">
+                    <textarea name="content" placeholder="燃气泄漏或其他紧急情况的描述（必填）"
+                              class="layui-textarea" lay-verify="required"></textarea>
+                </div>
+            </div>
+
+            <div class="layui-form-item">
+                <label class="layui-form-label">备注</label>
+                <div class="layui-input-block">
+                    <textarea name="remark" placeholder="其他备注（选填，将记入创建履历）"
+                              class="layui-textarea"></textarea>
+                </div>
+            </div>
+
+            <div class="layui-form-item">
+                <div class="layui-input-block">
+                    <span class="layui-font-12" style="color:#999">建单后依次经
+                        接单 → 开始抢修 → 提交抢修结果 → 现场复核 → 完工封卡，各环节不可跳级；封卡后永久封存。</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="bottom">
+        <div class="button-container">
+            <button type="submit" class="layui-btn layui-btn-normal layui-btn-sm" lay-submit=""
+                    lay-filter="gasRepairOrder-create">
+                <i class="layui-icon layui-icon-ok"></i>
+                创建工单
+            </button>
+        </div>
+    </div>
+</form>
+<th:block th:include="include :: footer"/>
+<script>
+    layui.use(['form', 'jquery', 'laydate'], function () {
+        let form = layui.form;
+        let $ = layui.jquery;
+        let laydate = layui.laydate;
+        let MODULE_PATH = rootPath + "/gasRepairOrder";
+
+        laydate.render({elem: '#dueAt', type: 'datetime', format: 'yyyy-MM-dd HH:mm:ss'});
+
+        //创建工单
+        form.on('submit(gasRepairOrder-create)', function (data) {
+            let loading = layer.load();
+            $.ajax({
+                url: MODULE_PATH + '/create',
+                data: data.field,
+                dataType: 'json',
+                contentType: 'application/x-www-form-urlencoded',
+                type: 'post',
+                success: function (result) {
+                    layer.close(loading);
+                    if (result.code == 200) {
+                        layer.msg(result.msg, {icon: 1, time: 1200}, function () {
+                            parent.layer.close(parent.layer.getFrameIndex(window.name));
+                            parent.layui.table.reload("gasRepairOrder-table");
+                        });
+                    } else {
+                        layer.msg(result.msg, {icon: 2, time: 2500});
+                    }
+                },
+                error: function () {
+                    layer.close(loading);
+                    layer.msg('网络异常，请重试', {icon: 2});
+                }
+            });
+            return false;
+        });
+    });
+</script>
+</body>
+</html>

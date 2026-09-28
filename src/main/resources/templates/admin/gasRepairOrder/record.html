@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:include="include :: header('抢修工单处置履历')"/>
+</head>
+<body class="pear-container">
+<input type="hidden" id="orderId" th:value="${orderId}">
+<div class="layui-card">
+    <div class="layui-card-body">
+        <table id="gasRepairOrderRecord-table" lay-filter="gasRepairOrderRecord-table"></table>
+    </div>
+</div>
+</body>
+
+<script type="text/html" id="gasRepairOrderRecord-action">
+    {{# if(d.action == 0){ }}
+    <span class="layui-badge layui-bg-gray">创建</span>
+    {{# }else if(d.action == 1){ }}
+    <span class="layui-badge layui-bg-blue">接单</span>
+    {{# }else if(d.action == 2){ }}
+    <span class="layui-badge layui-bg-orange">开始抢修</span>
+    {{# }else if(d.action == 3){ }}
+    <span class="layui-badge layui-bg-cyan">提交抢修结果</span>
+    {{# }else if(d.action == 4){ }}
+    <span class="layui-badge layui-bg-green">现场复核</span>
+    {{# }else if(d.action == 5){ }}
+    <span class="layui-badge">完工封卡</span>
+    {{# } }}
+</script>
+
+<th:block th:include="include :: footer"/>
+<script>
+    layui.use(['table', 'jquery'], function () {
+        let table = layui.table;
+        let $ = layui.jquery;
+
+        let MODULE_PATH = rootPath + "/gasRepairOrder/";
+        let cols = [
+            [
+                {title: 'ID', field: 'id', align: 'center', hide: true},
+                {title: '动作', field: 'action', align: 'center', width: 130, toolbar: '#gasRepairOrderRecord-action'},
+                {title: '完成后处置段', field: 'stageName', align: 'center', width: 120},
+                {title: '操作人', field: 'operator', align: 'center', width: 120},
+                {title: '操作备注/处置说明', field: 'remark', align: 'left'},
+                {title: '操作时间', field: 'createTime', align: 'center', width: 170}
+            ]
+        ];
+
+        //履历列表（不分页，按操作时间升序）
+        table.render({
+            elem: '#gasRepairOrderRecord-table',
+            url: MODULE_PATH + 'records?orderId=' + $('#orderId').val(),
+            page: false,
+            method: 'get',
+            cols: cols,
+            skin: 'line'
+        });
+    });
+</script>
+</html>

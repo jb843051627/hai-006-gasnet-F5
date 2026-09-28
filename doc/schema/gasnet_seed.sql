@@ -52,3 +52,63 @@ VALUES (7001, 'SB20260926000001', 0, 'GP00', '管段服役已满设计寿命，�
 -- 停用申请审批履历演示：7001 的运维提交留痕（action 0提交 1通过 2退回补充 3否决）
 INSERT IGNORE INTO t_gas_stop_bill_record (id, bill_id, bill_no, node_no, node_name, action, approver, opinion, create_time)
 VALUES (7001, 7001, 'SB20260926000001', 0, '运维申请', 0, 'seed', '管段服役已满设计寿命，近期泄漏普测浓度持续偏高，存在重大安全隐患，申请停用。', NOW());
+
+-- 抢修工单演示：覆盖 超期待接单 / 抢修中临期 / 全流程已封卡 三种情形
+-- stage 0待接单 1已接单 2抢修中 3待复核 4复核通过 5已封卡；status 0待接单 1在办 2已封卡
+-- 负责人均为 admin 用户(id=1)；6001 办结时限已过，下轮预警扫描即提醒；
+-- 6003 已封卡，各阶段操作人/时间直接随 INSERT 落库（封卡后触发器禁止 UPDATE，不能再回填）。
+INSERT IGNORE INTO t_gas_repair_order
+(id, biz_no, source, site_no, site_name, leak_level, content, contact_person, contact_phone,
+ owner_id, owner_name, stage, status,
+ accept_by, accept_time, repair_start_by, repair_start_time, repair_result,
+ submit_by, submit_time, review_by, review_time, review_remark, seal_by, seal_time,
+ due_at, warn_count, del_flag, create_by, create_time)
+VALUES
+(6001, 'WX20260925090001-0001', 1, NULL, '城东区东湖街道东湖小区3号楼底商厨房', 2,
+ '群众报修闻到明显燃气味，楼下燃气表箱处有嘶嘶漏气声，请求立即抢修。', '王女士', '13900000001',
+ 1, '管理员', 0, 0,
+ NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+ DATE_SUB(NOW(), INTERVAL 1 DAY), 0, 0, 'seed', DATE_SUB(NOW(), INTERVAL 2 DAY)),
+(6002, 'WX20260926103002-0002', 0, 'GP00-V07', '青坪市城区中压主干管段东湖路口阀井', 1,
+ '巡检发现阀井法兰微漏，已接单并开挖，正在更换密封垫片。', '巡检一班', '13900000002',
+ 1, '管理员', 2, 1,
+ 'admin', DATE_SUB(NOW(), INTERVAL 23 HOUR), 'admin', DATE_SUB(NOW(), INTERVAL 20 HOUR), NULL,
+ NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+ DATE_ADD(NOW(), INTERVAL 3 HOUR), 0, 0, 'seed', DATE_SUB(NOW(), INTERVAL 1 DAY)),
+(6003, 'WX20260920083003-0003', 2, NULL, '城南工业大道18号调压站', 1,
+ '应急接警：调压器出口压力异常，已完成泄放、换件、复测与现场复核，演示全流程封卡。', '值班长', '13900000003',
+ 1, '管理员', 5, 2,
+ 'admin', DATE_SUB(NOW(), INTERVAL 7 DAY), 'admin', DATE_SUB(NOW(), INTERVAL 7 DAY),
+ '已更换主膜片与密封件，恢复供气后保压30分钟无压降，检漏仪复测浓度0ppm。',
+ 'admin', DATE_SUB(NOW(), INTERVAL 6 DAY), 'admin', DATE_SUB(NOW(), INTERVAL 6 DAY),
+ '复核通过：现场压力、浓度复测合格，设备运行正常。', 'admin', DATE_SUB(NOW(), INTERVAL 6 DAY),
+ DATE_ADD(NOW(), INTERVAL 1 DAY), 0, 0, 'seed', DATE_SUB(NOW(), INTERVAL 7 DAY));
+
+-- 6001 创建履历
+INSERT IGNORE INTO t_gas_repair_order_record (id, order_id, biz_no, stage, stage_name, action, operator, remark, create_time)
+VALUES (6001, 6001, 'WX20260925090001-0001', 0, '待接单', 0, 'seed',
+ '群众报修闻到明显燃气味，楼下燃气表箱处有嘶嘶漏气声，请求立即抢修。', DATE_SUB(NOW(), INTERVAL 2 DAY));
+
+-- 6002 创建/接单/开工履历
+INSERT IGNORE INTO t_gas_repair_order_record (id, order_id, biz_no, stage, stage_name, action, operator, remark, create_time)
+VALUES
+(6010, 6002, 'WX20260926103002-0002', 0, '待接单', 0, 'seed', '巡检发现阀井法兰微漏。', DATE_SUB(NOW(), INTERVAL 1 DAY)),
+(6011, 6002, 'WX20260926103002-0002', 1, '已接单', 1, 'admin', '巡检一班领取工单。', DATE_SUB(NOW(), INTERVAL 23 HOUR)),
+(6012, 6002, 'WX20260926103002-0002', 2, '抢修中', 2, 'admin', '已开挖作业面，准备更换密封垫片。', DATE_SUB(NOW(), INTERVAL 20 HOUR));
+
+-- 6003 全流程履历：创建→接单→开工→提交结果→复核通过→完工封卡
+INSERT IGNORE INTO t_gas_repair_order_record (id, order_id, biz_no, stage, stage_name, action, operator, remark, create_time)
+VALUES
+(6020, 6003, 'WX20260920083003-0003', 0, '待接单', 0, 'seed', '应急接警：调压器出口压力异常。', DATE_SUB(NOW(), INTERVAL 7 DAY)),
+(6021, 6003, 'WX20260920083003-0003', 1, '已接单', 1, 'admin', '应急班组接单赶赴现场。', DATE_SUB(NOW(), INTERVAL 7 DAY)),
+(6022, 6003, 'WX20260920083003-0003', 2, '抢修中', 2, 'admin', '切断上游阀门并放空，开始更换调压器主膜片。', DATE_SUB(NOW(), INTERVAL 7 DAY)),
+(6023, 6003, 'WX20260920083003-0003', 3, '待复核', 3, 'admin',
+ '已更换主膜片与密封件，恢复供气后保压30分钟无压降，检漏仪复测浓度0ppm。', DATE_SUB(NOW(), INTERVAL 6 DAY)),
+(6024, 6003, 'WX20260920083003-0003', 4, '复核通过', 4, 'admin',
+ '复核通过：现场压力、浓度复测合格，设备运行正常。', DATE_SUB(NOW(), INTERVAL 6 DAY)),
+(6025, 6003, 'WX20260920083003-0003', 5, '已封卡', 5, 'admin',
+ '完工封卡，工单永久封存。', DATE_SUB(NOW(), INTERVAL 6 DAY));
+
+-- 超期预警定时任务：每小时第7分钟扫描超期未封卡的抢修工单，站内通知+邮件提醒负责人（同单24小时内不重复提醒）
+INSERT IGNORE INTO t_sys_quartz_job (id, job_name, job_group, invoke_target, cron_expression, misfire_policy, concurrent, status, create_by, create_time, remark)
+VALUES (9003, '抢修工单超期预警', 'GASNET', 'gasRepairOrderWarnTask.scanOverdue()', '0 7 * * * ?', '2', '1', 0, 'seed', NOW(), '每小时扫描超过办结时限仍未完工封卡的抢修工单，通知负责人督促尽快完成，同单24小时内不重复提醒');
